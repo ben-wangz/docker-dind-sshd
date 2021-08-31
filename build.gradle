@@ -1,0 +1,100 @@
+buildscript {
+    repositories {
+        maven { url("https://maven.aliyun.com/repository/public") }
+        maven { url("https://maven.aliyun.com/repository/spring") }
+        maven { url("https://maven.aliyun.com/repository/mapr-public") }
+        maven { url("https://maven.aliyun.com/repository/spring-plugin") }
+        maven { url("https://maven.aliyun.com/repository/gradle-plugin") }
+        maven { url("https://maven.aliyun.com/repository/google") }
+        maven { url("https://maven.aliyun.com/repository/jcenter") }
+    }
+}
+
+def mainVersion = "1.2.0"
+Map<String, String> envMap = new HashMap<>(System.getenv())
+def imageRepository = envMap.getOrDefault("IMAGE_REPOSITORY ", "wangz2019/docker-dind-sshd")
+def alpineRepo = envMap.getOrDefault("ALPINE_REPO", "mirrors.aliyun.com")
+def dockerBuildxVersion = envMap.getOrDefault("DOCKER_BUILDX_VERSION", "0.6.1")
+def dindVersion = envMap.getOrDefault("DIND_VERSION", "20.10.7-dind")
+String imageWithTag = "${imageRepository}:${mainVersion}"
+File runtimeDockerDirectory = project.file("${project.buildDir}/runtime/docker")
+
+task buildDockerImage() {
+    doFirst {
+        runtimeDockerDirectory.mkdirs()
+        runtimeDockerDirectory.delete()
+        copy {
+            from project.file("docker")
+            into runtimeDockerDirectory
+        }
+    }
+    doLast {
+        exec {
+            commandLine(
+                    "docker", "build",
+                    "--rm",
+                    "-f", project.file("${runtimeDockerDirectory.getAbsolutePath()}/Dockerfile"),
+                    "-t", imageWithTag,
+                    "--build-arg", "ALPINE_REPO=${alpineRepo}",
+                    "--build-arg", "DOCKER_BUILDX_VERSION=${dockerBuildxVersion}",
+                    "--build-arg", "DIND_VERSION=${dindVersion}",
+                    runtimeDockerDirectory,
+            )
+        }
+    }
+}
+
+task pushDockerImage() {
+    doLast {
+        exec {
+            commandLine(
+                    "docker", "buildx", "build",
+                    "--platform", "linux/amd64,linux/arm64,linux/arm/v7",
+                    "--rm",
+                    "-f", project.file("${runtimeDockerDirectory.getAbsolutePath()}/Dockerfile"),
+                    "-t", imageWithTag,
+                    "--build-arg", "ALPINE_REPO=${alpineRepo}",
+                    "--build-arg", "DOCKER_BUILDX_VERSION=${dockerBuildxVersion}",
+                    "--build-arg", "DIND_VERSION=${dindVersion}",
+                    "--push",
+                    runtimeDockerDirectory,
+            )
+        }
+    }
+    dependsOn(buildDockerImage)
+}
+
+def containerName = "docker-dind-sshd"
+def sshPort = 1022
+def dockerPort = 12375
+task runDockerContainer(type: Exec) {
+    String userPublicKeyPath = "${System.getenv("HOME")}/.ssh/id_rsa.pub";
+    def publicKeyFile = project.file(userPublicKeyPath)
+    def authorizedKeysContent = publicKeyFile.text
+    doFirst {
+        println("running command: ${String.join(" ", getCommandLine())}")
+    }
+    executable("docker")
+    args(
+            "run", "--rm", "--privileged",
+            "-p", "${sshPort}:22",
+            "-p", "${dockerPort}:2375",
+            "-e", "DOCKER_TLS_CERTDIR=",
+            "-e", "AUTHORIZED_KEYS=${authorizedKeysContent}",
+            "--name", containerName,
+            "-d", imageWithTag,
+    )
+    doLast {
+        println("login with command: ssh -o \"UserKnownHostsFile /dev/null\" -p ${sshPort} root@localhost")
+        println("use docker client to connect: docker -H tcp://localhost:${dockerPort} run hello-world:linux")
+    }
+}
+
+task stopDockerContainer(type: Exec) {
+    executable("docker")
+    args(
+            "stop", containerName
+    )
+}
+
+apply from: project.file("docs.nginx.gradle")
