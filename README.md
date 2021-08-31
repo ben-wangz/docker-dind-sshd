@@ -2,7 +2,7 @@
 
 1. docker image: [dockerhub](https://hub.docker.com/r/wangz2019/docker-dind-sshd)
 2. source code: [github](https://github.com/ben-wangz/docker-dind-sshd)
-3. docs: [docker-dind-sshd-docs](https://ben-wangz.github.io/docker-dind-sshd)
+3. docs: [docker-dind-sshd-docs](https://ben-wangz.github.io/docker-dind-sshd/index.html)
 
 ## what's it
 
