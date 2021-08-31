@@ -1,26 +1,48 @@
-### Simple usage
+# docker-dind-sshd
 
-- run docker
+1. docker image: [dockerhub](https://hub.docker.com/r/wangz2019/docker-dind-sshd)
+2. source code: [github](https://github.com/ben-wangz/docker-dind-sshd)
+3. docs: [docker-dind-sshd-docs](https://ben-wangz.github.io/docker-dind-sshd)
+
+## what's it
+
+1. docker image of dind bind with sshd
+2. mainly used for testing environment construction
+
+## usage
+
+1. start service
+    * build docker image
+        + optional
+        + ```shell
+          ./gradlew :buildDockerImage
+          ```
+    * run docker container
+        + ```shell
+          ./gradlew :runDockerContainer
+          ```
+        + ssh service will be exposed with port 1022
+    * jump into container with ssh
+        + ```shell
+          ssh -o "UserKnownHostsFile /dev/null" -p 1022 root@localhost
+          ```
+    * use docker client to connect to docker service
+        + ```shell
+          docker -H tcp://localhost:12375 run hello-world:linux
+          ```
+2. stop service
     * ```shell
-      docker run --rm --privileged \
-          -p 1022:22/tcp \
-          -p 12375:2375/tcp \
-          -e DOCKER_TLS_CERTDIR= \
-          -e AUTHORIZED_KEYS="$(cat $HOME/.ssh/id_rsa.pub)" \
-          -d wangz2019/docker-dind-sshd:1.1.0-linux-amd64
+      ./gradlew :stopDockerContainer
       ```
-    * check [dockerhub](https://hub.docker.com/r/wangz2019/docker-dind-sshd) for tags
-    * linux-arm64 is supported
-- use ssh to login
+3. build multi-platform images and push them to docker registry
     * ```shell
-      ssh -o "UserKnownHostsFile /dev/null" -p 1022 root@localhost
-      ```
-- use docker clinet to connect
-    * ```shell
-      docker -H tcp://localhost:12375 run hello-world:linux
+      ./gradlew :pushDockerImage
       ```
 
-### configuration
+* you need an environment to build multi-platform
+  images: [develop with docker](https://blog.geekcity.tech/#/docs/develop.with.docker)
+
+## configuration
 
 * AUTHORIZED_KEYS
     + configuring authorized_keys for openssh
